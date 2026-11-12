@@ -1,0 +1,142 @@
+name: Build desktop previews
+
+# Local preparation only: publishing this file does not automatically build or
+# publish anything. An authorized user must start a manual run in Actions.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: req-desktop-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '24.22.1'
+  RUSTUP_TOOLCHAIN: '1.99.0'
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: '0'
+
+jobs:
+  prepare:
+    name: Test and resolve shared dependencies
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, verified 2026-11-06
+        with:
+          persist-credentials: false
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install pinned Rust
+        shell: bash
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --no-self-update
+      - name: Install locked frontend dependencies
+        run: npm ci --no-audit
+      - name: Test and build frontend
+        run: |
+          node --test scripts/ci/collect-artifacts.test.mjs
+          npm test
+          npm run build
+      - name: Resolve Rust dependencies once for all platforms
+        shell: bash
+        run: |
+          if [[ -f src-tauri/Cargo.lock ]]; then
+            echo 'Using the committed Cargo.lock.'
+          else
+            echo '::warning::Cargo.lock is absent. This first resolution is not pinned across runs. Save and review the lockfile artifact, then commit it for future builds.'
+            cargo generate-lockfile --manifest-path src-tauri/Cargo.toml
+          fi
+          cargo test --locked --manifest-path src-tauri/Cargo.toml --lib
+      - name: Save shared Cargo.lock
+        if: ${{ always() && hashFiles('src-tauri/Cargo.lock') != '' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: req-cargo-lock-${{ github.run_id }}
+          path: src-tauri/Cargo.lock
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 30
+
+  desktop:
+    name: Build ${{ matrix.label }}
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: macOS Apple Silicon
+            runner: macos-15
+            target: aarch64-apple-darwin
+            platform: macos-arm64
+          - label: macOS Intel
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+            platform: macos-x64
+          - label: Windows x64
+            runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            platform: windows-x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 75
+    env:
+      REQ_TARGET: ${{ matrix.target }}
+      REQ_PLATFORM: ${{ matrix.platform }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Set up pinned Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      - name: Install pinned Rust and target
+        shell: bash
+        run: rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --target "$REQ_TARGET" --no-self-update
+      - name: Restore the exact shared dependency resolution
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: req-cargo-lock-${{ github.run_id }}
+          path: src-tauri
+      - name: Install locked frontend dependencies
+        run: npm ci --no-audit
+      - name: Test native core on this platform
+        run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib
+      - name: Build macOS app and DMG with ad-hoc signature only
+        if: runner.os == 'macOS'
+        env:
+          # '-' is a local ad-hoc signature, NOT Apple Developer ID signing.
+          # No certificate, Apple account, notarization, or release is configured.
+          APPLE_SIGNING_IDENTITY: '-'
+        run: npm run tauri -- build --ci --target ${{ matrix.target }} --bundles app,dmg -- --locked
+      - name: Build unsigned Windows installers
+        if: runner.os == 'Windows'
+        run: npm run tauri -- build --ci --target ${{ matrix.target }} --bundles nsis,msi --no-sign -- --locked
+      - name: Collect installers, preserved app archive, checksums and build metadata
+        run: node scripts/ci/collect-artifacts.mjs
+      - name: Upload desktop preview artifacts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: req-${{ matrix.platform }}-preview-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/${{ matrix.platform }}/
+          if-no-files-found: error
+          retention-days: 30
+          compression-level: 0
+      - name: Explain artifact trust and distribution limits
+        shell: bash
+        run: |
+          {
+            echo '### Req desktop preview'
+            echo "Platform: $REQ_PLATFORM"
+            echo 'These are development-preview artifacts, not a published release.'
+            echo 'macOS: ad-hoc signature only; no verified developer identity or Apple notarization. Gatekeeper warnings are expected.'
+            echo 'Windows: unsigned installers; SmartScreen or antivirus warnings may appear.'
+            echo 'Each artifact includes Cargo.lock, package-lock.json, build metadata and SHA256SUMS.txt. No GUI launch test is performed by this workflow.'
+          } >> "$GITHUB_STEP_SUMMARY"

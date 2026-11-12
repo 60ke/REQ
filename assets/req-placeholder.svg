@@ -1,0 +1,5 @@
+<!-- Temporary neutral packaging icon. This is not Req's final visual identity. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <rect x="80" y="80" width="864" height="864" rx="208" fill="#334155"/>
+  <path d="M310 752V272h222c116 0 180 61 180 155 0 72-37 122-104 145l126 180H601L492 589h-65v163H310Zm117-271h95c45 0 70-20 70-54 0-33-25-53-70-53h-95v107Z" fill="#F8FAFC"/>
+</svg>
