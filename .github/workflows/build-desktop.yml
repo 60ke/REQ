@@ -1,8 +1,11 @@
 name: Build desktop previews
 
-# Local preparation only: publishing this file does not automatically build or
-# publish anything. An authorized user must start a manual run in Actions.
+# Build installable previews automatically; never publish a Release.
 on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:

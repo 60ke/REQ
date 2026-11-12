@@ -30,4 +30,4 @@ npm run tauri build
 
 ## macOS / Windows 安装包构建
 
-已准备仅手动触发的 GitHub Actions 工作流，覆盖 Apple Silicon、Intel Mac 和 Windows x64。它不会自动发布；实际运行和安装验证仍待完成。依赖锁定、下载步骤、临时图标以及未签名/未公证限制见 [桌面构建说明](docs/DESKTOP_BUILDS.md)。
+GitHub Actions 会在推送到 `main`、面向 `main` 的 Pull Request 时自动构建，也支持手动运行，覆盖 Apple Silicon、Intel Mac 和 Windows x64。在 [Actions](https://github.com/60ke/REQ/actions/workflows/build-desktop.yml) 的对应运行页面下载 Artifacts。它不会创建 Release；安装和桌面启动验证仍需单独完成。依赖锁定、下载步骤、临时图标以及未签名/未公证限制见 [桌面构建说明](docs/DESKTOP_BUILDS.md)。

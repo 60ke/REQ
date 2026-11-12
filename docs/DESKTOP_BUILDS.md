@@ -1,12 +1,12 @@
 # macOS / Windows 开发预览包
 
-这里提供的是**待在 GitHub Actions 实际运行的构建配置**，不是已生成的安装包。
-当前只完成本地配置、脚本和前端检查；没有验证原生编译、安装或桌面界面启动。
+GitHub Actions 自动构建 Windows x64、macOS Apple Silicon 和 Intel Mac 开发预览安装包。
+构建结果以每次运行页面为准；CI 不包含安装或桌面界面启动验证。
 
 ## 如何运行
 
 1. 经授权后，把本项目内容放到 GitHub 仓库根目录。不要提交 `node_modules`、`dist` 或 `src-tauri/target`。
-2. 将 `.github/workflows/build-desktop.yml` 放在仓库默认分支。工作流只接受手动触发，不会在 push/PR 后自动运行，不会创建 Release 或推送提交。
+2. 将 `.github/workflows/build-desktop.yml` 放在仓库默认分支。推送到 `main`、面向 `main` 的 Pull Request 会自动触发构建；也支持手动触发。不会创建 Release 或推送提交。
 3. 打开 **Actions → Build desktop previews → Run workflow**，选择经过审核的分支。
 4. 等待准备任务和三个平台任务成功，在该次运行页面的 **Artifacts** 下载对应压缩包。每个平台独立构建，失败的平台不会上传不完整安装包。
 
