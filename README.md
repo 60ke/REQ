@@ -17,7 +17,7 @@ npm run tauri dev
 npm run tauri build
 ```
 
-前端测试与构建：`npm test`、`npm run build`。Rust 测试：`cargo test --manifest-path src-tauri/Cargo.toml`。原生端没有 Cargo.lock，首次构建需要解析和下载依赖。
+前端测试与构建：`npm test`、`npm run build`。Rust 测试：`cargo test --manifest-path src-tauri/Cargo.toml`。已提交 Cargo.lock，CI 使用 `--locked` 固定 Rust 依赖解析。
 
 ## 当前限制与安全
 - 本次只验证前端 39 项测试和生产构建；Rust 构建、桌面运行和真实浏览器端到端测试尚未执行。请先在测试环境验证。

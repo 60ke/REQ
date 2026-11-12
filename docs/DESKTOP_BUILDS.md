@@ -22,8 +22,8 @@ GitHub Actions 自动构建 Windows x64、macOS Apple Silicon 和 Intel Mac 开�
 ## 依赖与复现
 
 - Node.js 固定为 `24.22.1`，Rust 固定为 `1.99.0`。前端通过 `npm ci` 使用已有锁文件；工作流引用的 GitHub Actions 固定到已核实的提交 SHA。
-- 如果仓库尚无 `src-tauri/Cargo.lock`，准备任务会生成一次，上传后供三个平台共同使用。**这次初始解析在不同运行之间仍可能得到不同版本**，不能声称依赖已经完全固定。
-- 核验首次构建后，将下载的 `Cargo.lock` 放回 `src-tauri/` 并审核提交。后续测试与构建使用 `--locked`，不会静默改写锁文件。
+- 已提交首次 CI 解析的 `src-tauri/Cargo.lock`，所有平台共享同一份 Rust 依赖锁文件；测试与构建使用 `--locked`，不会静默改写锁文件。
+- 如果将来移除锁文件，准备任务会警告并重新解析，上传后供所有平台使用；建议审核后重新提交锁文件，避免不同运行之间的版本漂移。
 - 要重现旧产物，使用元数据里的源码 commit、工具链版本，以及该产物附带的两个锁文件。GitHub 托管 runner、SDK 和系统工具仍会更新，因此不保证逐字节一致。
 - 使用固定的 `macos-15`、`macos-15-intel` 和 `windows-2022` 标签，分别原生构建 ARM Mac、Intel Mac 和 Windows x64。没有跨平台假冒产物，也没有 Windows ARM 构建。
 

@@ -12,9 +12,52 @@ fn encode(value: &str) -> String {
     url::form_urlencoded::Serializer::new(String::new()).append_pair("", value).finish()[1..].to_owned()
 }
 
+// shlex 1.x emits an empty word for a standalone backslash-newline.
+// Remove only unquoted continuations before tokenization. Do not filter empty
+// tokens: an explicitly quoted empty argument is meaningful (for example -d '').
+fn remove_unquoted_continuations(input: &str) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut chars = input.chars().peekable();
+    let mut quote = None;
+    let mut word_start = true;
+    let mut comment = false;
+    while let Some(ch) = chars.next() {
+        if comment {
+            output.push(ch);
+            if ch == '\n' { comment = false; word_start = true; }
+            continue;
+        }
+        if let Some(delimiter) = quote {
+            output.push(ch);
+            if ch == delimiter { quote = None; }
+            else if delimiter == '"' && ch == '\\' {
+                // Preserve double-quoted escapes for shlex, including newlines.
+                if let Some(next) = chars.next() { output.push(next); }
+            }
+            continue;
+        }
+        if ch == '\\' {
+            if chars.peek() == Some(&'\n') { chars.next(); continue; }
+            output.push(ch);
+            if let Some(next) = chars.next() { output.push(next); }
+            word_start = false;
+            continue;
+        }
+        output.push(ch);
+        match ch {
+            '\'' | '"' => { quote = Some(ch); word_start = false; },
+            '#' if word_start => comment = true,
+            ' ' | '\t' | '\n' => word_start = true,
+            _ => word_start = false,
+        }
+    }
+    output
+}
+
 pub fn import(curl: &str) -> Result<Request, String> {
     if curl.len() > MAX_CURL_BYTES { return Err("cURL input is limited to 1 MiB.".into()); }
-    let tokens = shlex::split(curl).ok_or("The cURL command contains an unclosed quote or escape.")?;
+    let normalized = remove_unquoted_continuations(curl);
+    let tokens = shlex::split(&normalized).ok_or("The cURL command contains an unclosed quote or escape.")?;
     if tokens.first().map(String::as_str) != Some("curl") {
         return Err("Paste one command beginning with curl. Shell commands are never executed.".into());
     }
@@ -160,6 +203,28 @@ mod tests {
         let req = import("curl --url 'https://example.com/v1' \\\n -H 'Authorization: Bearer example' \\\n --json '{\"name\":\"Ada Lovelace\"}'").unwrap();
         assert_eq!(req.method, "POST"); assert_eq!(req.body_type, BodyType::Json);
         assert_eq!(req.body, "{\"name\":\"Ada Lovelace\"}"); assert_eq!(req.headers[0].value, "Bearer example");
+    }
+    #[test]
+    fn continuations_preserve_empty_arguments_and_quoted_body_data() {
+        let empty = import("curl https://example.com \\\n --data-raw ''").unwrap();
+        assert_eq!(empty.method, "POST");
+        assert_eq!(empty.body, "");
+        let single = import("curl https://example.com --data-raw 'first\\\nsecond'").unwrap();
+        assert_eq!(single.body, "first\\\nsecond");
+        let double = import("curl https://example.com --data-raw \"first\\\nsecond\"").unwrap();
+        assert_eq!(double.body, "firstsecond");
+        let newline = import("curl https://example.com --data-raw 'first\nsecond'").unwrap();
+        assert_eq!(newline.body, "first\nsecond");
+    }
+    #[test]
+    fn continuations_preserve_escaping_and_comments() {
+        assert_eq!(remove_unquoted_continuations("curl \\\n --url https://example.com"), "curl  --url https://example.com");
+        // Two backslashes encode a literal backslash, not a continuation.
+        assert_eq!(remove_unquoted_continuations("curl \\\\\n"), "curl \\\\\n");
+        let req = import("curl https://example.com # ignored \\\n --data-raw 'body'").unwrap();
+        assert_eq!(req.body, "body");
+        assert!(import("curl https://example.com \\\n https://other.example").is_err());
+        assert!(import("curl https://example.com \\\n ; echo unsafe").is_err());
     }
     #[test]
     fn explicit_method_and_repeated_data_are_preserved() {
