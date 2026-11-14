@@ -1,6 +1,6 @@
 # Req 0.1 开发预览版
 
-本地优先的 API 请求工具。当前版本是开发预览，不需要账号或云服务，尚未完成原生桌面端验证，不建议用于生产敏感数据。
+本地优先的 API 请求工具。当前版本是开发预览，不需要账号或云服务，已完成 CI 原生测试与打包，尚未完成安装后的桌面运行和设计验收，不建议用于生产敏感数据。
 
 ## 已实现
 - HTTP 请求编辑、参数、请求头、文本/JSON/表单请求体、Bearer/Basic/API Key 认证。
@@ -20,13 +20,15 @@ npm run tauri build
 前端测试与构建：`npm test`、`npm run build`。Rust 测试：`cargo test --manifest-path src-tauri/Cargo.toml`。已提交 Cargo.lock，CI 使用 `--locked` 固定 Rust 依赖解析。
 
 ## 当前限制与安全
-- 本次只验证前端 39 项测试和生产构建；Rust 构建、桌面运行和真实浏览器端到端测试尚未执行。请先在测试环境验证。
+- [已完成的 CI 构建](https://github.com/60ke/REQ/actions/runs/43167538629) 对应源码提交 `deb2f59e7ff76c09725e173de968d53ad85c0e74`：前端 39 项测试、生产构建、3 项产物脚本测试，以及各平台 25 项 Rust 核心测试通过；Windows x64、macOS Apple Silicon 和 Intel 安装包均已生成并校验。
+- 安装后的 GUI 启动、真实浏览器端到端测试和界面设计验收尚未完成。CI 成功不等于这些验证已经通过，请先在测试环境使用。
+- Windows 安装包未签名；macOS 仅使用 ad-hoc 签名，未使用 Apple Developer ID 签名，也未经过 Apple 公证。系统可能显示安全警告或阻止运行。
 - AI 未接入；脚本/断言、OAuth、文件上传、二进制响应下载、客户端证书、WebSocket、gRPC 等尚未完成。
 - 密钥仅会话内保留，没有系统钥匙串集成；工作区文件没有加密。自动过滤不能识别所有正文或自定义字段中的秘密，不要保存敏感正文。导出的 cURL 可能包含密钥，应谨慎分享。
 - cURL 解析不执行 shell，未支持选项会报错；跨域重定向默认不跟随，响应体有大小上限。取消不能撤销已到达服务器的操作。
 - 详细网络、安全和功能范围见 `src-tauri/README.md`。
 
-项目名称 Req 暂定。源码尚未选择开源许可证，也未发布到公共仓库。
+项目名称 Req 暂定。源码已发布到 [公开仓库](https://github.com/60ke/REQ)，但尚未选择开源许可证；公开可见不代表已授予开源使用许可。
 
 ## macOS / Windows 安装包构建
 
